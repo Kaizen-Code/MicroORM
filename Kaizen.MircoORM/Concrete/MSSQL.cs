@@ -10,19 +10,15 @@ using System.Threading.Tasks;
 
 namespace Kaizen.MircoORM.Concrete
 {
-    public class MSSQL : IDataService
+    class MSSQL : IDataService
     {
         static string _connenctionString;
         
-        MSSQL()
+        public MSSQL()
         {
             _connenctionString = ConfigurationManager.ConnectionStrings["DefaultConnectionString"].ConnectionString;
         }
 
-        public void BulkInsert(DataTable table)
-        {
-            throw new NotImplementedException();
-        }
         private SqlParameter[] createParameters(object parameters)
         {
             if (parameters == null)
@@ -64,27 +60,7 @@ namespace Kaizen.MircoORM.Concrete
                 return ans;
             }
         }
-
-
-        public int ExecuteNonQuery(string sql, object parameters, bool isStoredProcedure = true)
-        {
-            var sqlParams = this.createParameters(parameters);
-            var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
-            return this.executeNonQuery(sql, sqlParams, cmdType);
-        }
-
-        public int ExecuteNonQuery(string sql, SqlParameter[] parameters,SqlParameter returnParameter, bool isStoredProcedure = true)
-        {
-            throw new NotImplementedException();
-        }
-
-        public object ExecuteScalar(string sql, object parameters, bool isStoredProcedure = true)
-        {
-            var sqlParams = this.createParameters(parameters);
-            var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
-            return this.executeScalar(sql, sqlParams, cmdType);
-        }
-        private IEnumerable<SqlDataReader> reading(string sql,SqlParameter[] sqlParameters,CommandType cmdType)
+        private IEnumerable<SqlDataReader> reading(string sql, SqlParameter[] sqlParameters, CommandType cmdType)
         {
             using (SqlConnection con = new SqlConnection(_connenctionString))
             using (SqlCommand cmd = new SqlCommand(sql, con))
@@ -105,7 +81,31 @@ namespace Kaizen.MircoORM.Concrete
                 con.Close();
             }
         }
-        private IEnumerable<T> findAll<T>(string sql,SqlParameter[] sqlParameters,CommandType cmdType) where T: new()
+
+
+        public int ExecuteNonQuery(string sql, SqlParameter[] parameters, SqlParameter returnParameter, CommandType cmdType)
+        {
+            throw new NotImplementedException();
+        }
+        public int ExecuteNonQuery(string sql, object parameters, bool isStoredProcedure = true)
+        {
+            var sqlParams = this.createParameters(parameters);
+            var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
+            return this.executeNonQuery(sql, sqlParams, cmdType);
+        }
+
+        
+
+        
+        public object ExecuteScalar(string sql, SqlParameter[] sqlParameters, CommandType cmdType) => this.ExecuteScalar(sql, sqlParameters, cmdType);
+        public object ExecuteScalar(string sql, object parameters, bool isStoredProcedure = true)
+        {
+            var sqlParams = this.createParameters(parameters);
+            var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
+            return this.executeScalar(sql, sqlParams, cmdType);
+        }
+
+        public IEnumerable<T> FindAll<T>(string sql, SqlParameter[] sqlParameters, CommandType cmdType) where T : new()
         {
             var props = typeof(T).GetProperties();
             var data = this.reading(sql, sqlParameters, cmdType);
@@ -114,19 +114,25 @@ namespace Kaizen.MircoORM.Concrete
                 var obj = new T();
                 foreach (var p in props)
                 {
-                    p.SetValue(obj, item[p.Name],null);
+                    p.SetValue(obj, item[p.Name], null);
                 }
                 yield return obj;
             }
         }
-        private IEnumerable<T> QueringData<T>(string sql, SqlParameter[] sqlParameters, CommandType cmdType) where T : new()
+        public IEnumerable<T> FindAll<T>(string sql, object parameters, bool isStoredProcedure = true) where T : new()
         {
-            
+            var sqlParams = this.createParameters(parameters);
+            var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
+            return this.FindAll<T>(sql, sqlParams, cmdType);
+        }
+
+        public IEnumerable<T> QueringData<T>(string sql, SqlParameter[] sqlParameters, CommandType cmdType) where T : new()
+        {
             PropertyInfo[] propInfos = null;
             var data = this.reading(sql, sqlParameters, cmdType);
             foreach (var item in data)
             {
-                if(propInfos == null)
+                if (propInfos == null)
                 {
                     propInfos = new PropertyInfo[item.FieldCount];
                     var type = typeof(T);
@@ -143,34 +149,44 @@ namespace Kaizen.MircoORM.Concrete
                 yield return obj;
             }
         }
-        public IEnumerable<T> FindAll<T>(string sql, object parameters, bool isStoredProcedure = true) where T : class, new()
+        public IEnumerable<T> QueringData<T>(string sql, object parameters, bool isStoredProcedure = true) where T : new()
         {
             var sqlParams = this.createParameters(parameters);
             var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
-            return this.findAll<T>(sql, sqlParams, cmdType);
+            return this.QueringData<T>(sql, sqlParams, cmdType);
         }
-
-        public T FirstOrDefault<T>(string sql, object parameters, bool isStoredProcedure = true) where T : class, new()
+        public T FirstOrDefault<T>(string sql, SqlParameter[] sqlParameters, CommandType cmdType) where T : class, new()
         {
             T ans = null;
-            var sqlParams = this.createParameters(parameters);
-            var cmdType = isStoredProcedure ? CommandType.StoredProcedure : CommandType.Text;
-            foreach (var item in this.findAll<T>(sql, sqlParams, cmdType))
+            foreach (var item in this.FindAll<T>(sql, sqlParameters, cmdType))
             {
                 ans = item;
                 break;
             }
             return ans;
         }
-
+        public T FirstOrDefault<T>(string sql, object parameters, bool isStoredProcedure = true) where T : class, new()
+        {
+            T ans = null;
+            foreach (var item in this.FindAll<T>(sql, parameters, isStoredProcedure))
+            {
+                ans = item;
+                break;
+            }
+            return ans;
+        }
+        public DataTable GetDataTable(string sql, SqlParameter[] sqlParameters, CommandType cmdType)
+        {
+            throw new NotImplementedException();
+        }
         public DataTable GetDataTable(string sql, object parameters, bool isStoredProcedure = true)
         {
             throw new NotImplementedException();
         }
-
-        public object GetSingle(string sql, object parameters, bool isStoredProcedure = true)
+        public void BulkInsert(DataTable table)
         {
             throw new NotImplementedException();
         }
+
     }
 }
